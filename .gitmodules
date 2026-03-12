@@ -71,3 +71,9 @@
 [submodule "submodules/minios-translations"]
 	path = submodules/minios-translations
 	url = https://github.com/minios-linux/minios-translations.git
+[submodule "submodules/minios-store"]
+	path = submodules/minios-store
+	url = https://github.com/minios-linux/minios-store.git
+[submodule "submodules/lokit"]
+	path = submodules/lokit
+	url = https://github.com/minios-linux/lokit
