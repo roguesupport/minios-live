@@ -725,9 +725,9 @@ determine_command_range() {
 # Check internet connectivity
 check_internet_connection() {
     if command -v wget >/dev/null; then
-        wget -q --spider https://google.com
+        wget -q --spider http://deb.debian.org
     elif command -v curl >/dev/null; then
-        curl --silent --head https://google.com
+        curl --silent --head http://deb.debian.org
     else
         error "Neither wget nor curl is available on this system."
         exit 1
@@ -1229,15 +1229,15 @@ ubuntu_pro_is_available() {
     if [ "${DISTRIBUTION_TYPE}" != "ubuntu" ]; then
         return 1
     fi
-    
+
     # Pro is available for all Ubuntu LTS versions
     case "${DISTRIBUTION}" in
-        bionic|focal|jammy|noble)
-            return 0
-            ;;
-        *)
-            return 1
-            ;;
+    bionic | focal | jammy | noble)
+        return 0
+        ;;
+    *)
+        return 1
+        ;;
     esac
 }
 
@@ -1247,10 +1247,10 @@ ubuntu_pro_is_available() {
 # Returns: 0 on success, 1 on failure
 ubuntu_pro_attach() {
     current_function
-    
+
     local CHROOT_DIR="${1}"
     local TOKEN="${UBUNTU_PRO_TOKEN:-}"
-    
+
     # Skip if no token provided
     if [ -z "${TOKEN}" ]; then
         if [ "${VERBOSITY_LEVEL}" -ge 2 ]; then
@@ -1258,7 +1258,7 @@ ubuntu_pro_attach() {
         fi
         return 0
     fi
-    
+
     # Skip if Ubuntu Pro is not available for this distribution
     if ! ubuntu_pro_is_available; then
         if [ "${VERBOSITY_LEVEL}" -ge 1 ]; then
@@ -1266,12 +1266,12 @@ ubuntu_pro_attach() {
         fi
         return 0
     fi
-    
+
     information "Activating Ubuntu Pro subscription..."
-    
+
     # Update package lists first
     run_with_spinner "Updating package lists" chroot "${CHROOT_DIR}" apt-get update -qq
-    
+
     # Install or upgrade ubuntu-advantage-tools to ensure we have the latest version
     if ! chroot "${CHROOT_DIR}" dpkg -l ubuntu-advantage-tools >/dev/null 2>&1; then
         if [ "${VERBOSITY_LEVEL}" -ge 1 ]; then
@@ -1285,25 +1285,25 @@ ubuntu_pro_attach() {
         fi
         run_with_spinner "Upgrading ubuntu-advantage-tools" chroot "${CHROOT_DIR}" apt-get install --only-upgrade -y ubuntu-advantage-tools
     fi
-    
+
     # Attach the token using 'pro' command (available after upgrade)
     if chroot "${CHROOT_DIR}" pro attach "${TOKEN}" --no-auto-enable 2>&1 | tee /tmp/pro-attach.log; then
         information "Ubuntu Pro successfully activated"
-        
+
         # Enable ESM repositories for fresh packages
         if [ "${VERBOSITY_LEVEL}" -ge 1 ]; then
             information "Enabling ESM repositories for security updates..."
         fi
-        
+
         # Enable ESM Infra (infrastructure packages)
         chroot "${CHROOT_DIR}" pro enable esm-infra --assume-yes 2>&1 | grep -v "^$" || true
-        
+
         # Enable ESM Apps (application packages) if available
         chroot "${CHROOT_DIR}" pro enable esm-apps --assume-yes 2>&1 | grep -v "^$" || true
-        
+
         # Update package lists with Pro repositories
         run_with_spinner "Updating package lists with Pro repositories" chroot "${CHROOT_DIR}" apt-get update -qq
-        
+
         information "Ubuntu Pro repositories are now active"
         rm -f /tmp/pro-attach.log
         return 0
@@ -1321,24 +1321,24 @@ ubuntu_pro_attach() {
 # Returns: 0 on success
 ubuntu_pro_detach() {
     current_function
-    
+
     local CHROOT_DIR="${1}"
-    
+
     # Skip if Ubuntu Pro is not available
     if ! ubuntu_pro_is_available; then
         return 0
     fi
-    
+
     # Skip if no token was provided
     if [ -z "${UBUNTU_PRO_TOKEN:-}" ]; then
         return 0
     fi
-    
+
     information "Deactivating Ubuntu Pro subscription..."
-    
+
     # Detach the subscription using 'pro' command
     chroot "${CHROOT_DIR}" pro detach --assume-yes 2>/dev/null || true
-    
+
     # Clean up all traces
     ubuntu_pro_cleanup_traces "${CHROOT_DIR}"
 }
@@ -1349,31 +1349,31 @@ ubuntu_pro_detach() {
 # Returns: 0 on success
 ubuntu_pro_cleanup_traces() {
     current_function
-    
+
     local CHROOT_DIR="${1}"
-    
+
     if [ "${VERBOSITY_LEVEL}" -ge 1 ]; then
         information "Removing Ubuntu Pro traces from the system..."
     fi
-    
+
     # Remove Pro configuration and state directories
     rm -rf "${CHROOT_DIR}/var/lib/ubuntu-advantage" 2>/dev/null || true
     rm -rf "${CHROOT_DIR}/etc/ubuntu-advantage" 2>/dev/null || true
     rm -f "${CHROOT_DIR}/var/log/ubuntu-advantage"* 2>/dev/null || true
-    
+
     # Remove ESM and Pro source lists
     rm -f "${CHROOT_DIR}/etc/apt/sources.list.d/ubuntu-"*".list" 2>/dev/null || true
     rm -f "${CHROOT_DIR}/etc/apt/sources.list.d/ubuntu-esm-"*.list 2>/dev/null || true
-    
+
     # Remove authentication files for ESM repositories
     rm -f "${CHROOT_DIR}/etc/apt/auth.conf.d/"*"ubuntu-advantage"* 2>/dev/null || true
     rm -f "${CHROOT_DIR}/etc/apt/auth.conf.d/"*"ubuntu-pro"* 2>/dev/null || true
-    
+
     # Remove apt preferences for Pro
     rm -f "${CHROOT_DIR}/etc/apt/preferences.d/ubuntu-"* 2>/dev/null || true
     rm -f "${CHROOT_DIR}/etc/apt/preferences.d/ubuntu-pro-"* 2>/dev/null || true
     rm -f "${CHROOT_DIR}/etc/apt/preferences.d/ubuntu-esm-"* 2>/dev/null || true
-    
+
     # Remove keyrings
     rm -f "${CHROOT_DIR}/etc/apt/trusted.gpg.d/ubuntu-advantage-"* 2>/dev/null || true
     rm -f "${CHROOT_DIR}/etc/apt/trusted.gpg.d/ubuntu-pro-"* 2>/dev/null || true
@@ -1381,14 +1381,14 @@ ubuntu_pro_cleanup_traces() {
     rm -f "${CHROOT_DIR}/usr/share/keyrings/ubuntu-advantage-"* 2>/dev/null || true
     rm -f "${CHROOT_DIR}/usr/share/keyrings/ubuntu-pro-"* 2>/dev/null || true
     rm -f "${CHROOT_DIR}/usr/share/keyrings/ubuntu-esm-"* 2>/dev/null || true
-    
+
     # Remove Pro systemd services and timers
     rm -f "${CHROOT_DIR}/etc/systemd/system/multi-user.target.wants/ua-"* 2>/dev/null || true
     rm -f "${CHROOT_DIR}/etc/systemd/system/timers.target.wants/ua-"* 2>/dev/null || true
-    
+
     # Update apt cache after removing repositories
     chroot "${CHROOT_DIR}" apt-get update -qq 2>/dev/null || true
-    
+
     if [ "${VERBOSITY_LEVEL}" -ge 1 ]; then
         information "Ubuntu Pro traces successfully removed"
     fi
@@ -1605,6 +1605,11 @@ EOF
         # Add MiniOS Linux repository
         {
             [[ "${DISTRIBUTION}" =~ ^(buster|bookworm|trixie|sid)$ ]] && cat <<EOF
+deb http://deb.minios.dev/debian/ ${DISTRIBUTION} main contrib non-free
+#deb-src http://deb.minios.dev/debian/ ${DISTRIBUTION} main contrib non-free
+
+EOF
+            [[ "${DISTRIBUTION}" =~ ^(bionic|focal|jammy|noble)$ ]] && cat <<EOF
 deb http://deb.minios.dev/debian/ ${DISTRIBUTION} main contrib non-free
 #deb-src http://deb.minios.dev/debian/ ${DISTRIBUTION} main contrib non-free
 
@@ -2790,33 +2795,33 @@ generate_localized_grub_config() {
 
     # Map language codes to timezone and keyboard settings (based on grub.multilang.cfg)
     case "$LANG_CODE" in
-        en_US)
-            # No extra params for English
-            ;;
-        ru_RU)
-            EXTRA_PARAMS="timezone=Europe/Moscow keyboard-layouts=us,ru"
-            ;;
-        de_DE)
-            EXTRA_PARAMS="timezone=Europe/Berlin keyboard-layouts=us,de"
-            ;;
-        es_ES)
-            EXTRA_PARAMS="timezone=Europe/Madrid keyboard-layouts=us,es"
-            ;;
-        fr_FR)
-            EXTRA_PARAMS="timezone=Europe/Paris keyboard-layouts=us,fr"
-            ;;
-        id_ID)
-            EXTRA_PARAMS="timezone=Asia/Jakarta keyboard-layouts=id"
-            ;;
-        it_IT)
-            EXTRA_PARAMS="timezone=Europe/Rome keyboard-layouts=us,it"
-            ;;
-        pt_BR)
-            EXTRA_PARAMS="timezone=America/Sao_Paulo keyboard-layouts=us,br"
-            ;;
-        pt_PT)
-            EXTRA_PARAMS="timezone=Europe/Lisbon keyboard-layouts=us,pt"
-            ;;
+    en_US)
+        # No extra params for English
+        ;;
+    ru_RU)
+        EXTRA_PARAMS="timezone=Europe/Moscow keyboard-layouts=us,ru"
+        ;;
+    de_DE)
+        EXTRA_PARAMS="timezone=Europe/Berlin keyboard-layouts=us,de"
+        ;;
+    es_ES)
+        EXTRA_PARAMS="timezone=Europe/Madrid keyboard-layouts=us,es"
+        ;;
+    fr_FR)
+        EXTRA_PARAMS="timezone=Europe/Paris keyboard-layouts=us,fr"
+        ;;
+    id_ID)
+        EXTRA_PARAMS="timezone=Asia/Jakarta keyboard-layouts=id"
+        ;;
+    it_IT)
+        EXTRA_PARAMS="timezone=Europe/Rome keyboard-layouts=us,it"
+        ;;
+    pt_BR)
+        EXTRA_PARAMS="timezone=America/Sao_Paulo keyboard-layouts=us,br"
+        ;;
+    pt_PT)
+        EXTRA_PARAMS="timezone=Europe/Lisbon keyboard-layouts=us,pt"
+        ;;
     esac
 
     # Add locales parameter and extra params to all linux command lines
