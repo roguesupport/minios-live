@@ -70,6 +70,15 @@ apply_debconf() {
 
 run_with_spinner "Applying debconf settings" apply_debconf
 
+# Prevent service start/reload actions inside chroot during package setup.
+if [ "${DISTRIBUTION}" = "bionic" ]; then
+    cat > /usr/sbin/policy-rc.d <<'EOF'
+#!/bin/sh
+exit 101
+EOF
+    chmod 755 /usr/sbin/policy-rc.d
+fi
+
 if [ "$PACKAGE_VARIANT" = "minimum" ]; then
     cat <<EOF >/etc/dpkg/dpkg.cfg.d/exclusions
 path-exclude=/usr/share/man/*
@@ -97,7 +106,36 @@ fi
 
 run_with_spinner "Updating package lists" apt-get update --allow-releaseinfo-change
 
+TMPFILES_WRAPPED="false"
+TMPFILES_BIN="$(command -v systemd-tmpfiles 2>/dev/null || true)"
+TMPFILES_REAL=""
+if [ "${DISTRIBUTION}" = "bionic" ] && [ -n "${TMPFILES_BIN}" ] && [ -x "${TMPFILES_BIN}" ]; then
+    dpkg-divert --local --rename --add "${TMPFILES_BIN}" >/dev/null
+    TMPFILES_REAL="${TMPFILES_BIN}.distrib"
+    cat > "${TMPFILES_BIN}" <<EOF
+#!/bin/sh
+if [ "\$1" = "--create" ]; then
+    exit 0
+fi
+exec "${TMPFILES_REAL}" "\$@"
+EOF
+    chmod 755 "${TMPFILES_BIN}"
+    TMPFILES_WRAPPED="true"
+fi
+
+set +e
 run_with_spinner "Upgrading installed packages" apt-get upgrade -y
+UPGRADE_RC=$?
+set -e
+
+if [ "${TMPFILES_WRAPPED}" = "true" ]; then
+    rm -f "${TMPFILES_BIN}"
+    dpkg-divert --rename --remove "${TMPFILES_BIN}" >/dev/null
+fi
+
+if [ "${UPGRADE_RC}" -ne 0 ]; then
+    exit "${UPGRADE_RC}"
+fi
 
 # Add Docker official repository for ultra variant
 if [ "$PACKAGE_VARIANT" = "ultra" ]; then
